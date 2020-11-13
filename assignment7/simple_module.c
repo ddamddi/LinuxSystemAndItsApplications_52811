@@ -44,7 +44,7 @@ struct simple_list{
     unsigned int data;
 };
 
-void struct_example(int op)
+void linux_linked_list_example(int op)
 {
 
     if (op == INSERT)
@@ -195,7 +195,7 @@ void delete()
 int __init simple_module_init(void)
 {
     int op = SEARCH;
-    struct_example(op);
+    linux_linked_list_example(op);
     printk(KERN_EMERG "Hello Simple Module\n");
     return 0;
 }
