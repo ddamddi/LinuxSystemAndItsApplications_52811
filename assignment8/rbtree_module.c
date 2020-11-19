@@ -1,5 +1,5 @@
 #define BILLION 1000000000
-#define NUM_OF_ENTRY 100000
+#define NUM_OF_ENTRY 10000
 
 #define INSERT 0
 #define SEARCH 1
@@ -14,11 +14,31 @@
 #include <linux/rbtree.h> // for Red-Black tree
 #include <linux/time.h>
 
+void rbtree_print(void);
 void insert(void);
 void search(void);
 void delete(void);
-void rb_init_node(struct rb_node *rb);
-void rbtree_print(void);
+
+struct my_node{
+    struct rb_node node;
+    unsigned int key;
+    unsigned int value;
+};
+
+unsigned long long add_to_hp_list_time = 0;
+unsigned long long add_to_hp_list_count = 0;
+struct timespec64 spclock[2];
+struct rb_root root_node = RB_ROOT;
+
+void initialize_ts64(struct timespec64 *spclock)
+{
+    int i;
+    for(i=0; i<2; i++)
+    {
+        spclock[i].tv_sec = 0;
+    	spclock[i].tv_nsec = 0;
+    }
+}
 
 unsigned long long calclock3(struct timespec64 *spclock, unsigned long long *total_time, unsigned long long *total_count){
     long temp, temp_n;
@@ -41,30 +61,6 @@ unsigned long long calclock3(struct timespec64 *spclock, unsigned long long *tot
     return timedelay;
 }
 
-
-void initialize_ts64(struct timespec64 *spclock)
-{
-    int i;
-    for(i=0; i<2; i++)
-    {
-        spclock[i].tv_sec = 0;
-    	spclock[i].tv_nsec = 0;
-    }
-}
-
-
-struct my_node{
-    struct rb_node node;
-    unsigned int key;
-    unsigned int value;
-};
-
-unsigned long long add_to_hp_list_time = 0;
-unsigned long long add_to_hp_list_count = 0;
-struct timespec64 spclock[2];
-struct rb_root root_node = RB_ROOT;
-
-
 void rb_init_node(struct rb_node *rb)
 {
    rb->__rb_parent_color = 0;
@@ -72,7 +68,6 @@ void rb_init_node(struct rb_node *rb)
    rb->rb_left = NULL;
    RB_CLEAR_NODE(rb);
 }
-
 
 void rbtree_print()
 {
@@ -115,9 +110,9 @@ void insert()
             
             parent = *new;
             if(new_node->key > connect->key)
-                new = &((*new)->rb_left);
+                new = &((*new)->rb_right);
             else if (new_node->key < connect->key)
-            	new = &((*new)->rb_right);
+            	new = &((*new)->rb_left);
             else
             	printk("RB-TREE INSERT ERROR");
         }
@@ -161,16 +156,15 @@ void search(){
         struct rb_node **new = &(root_node.rb_node);
         struct rb_node *parent = NULL;
         
-        
         while(*new)
         {
             struct my_node *connect = rb_entry(*new, struct my_node, node);
             
             parent = *new;
             if (new_node->key > connect->key)
-                new = &((*new)->rb_left);
+                new = &((*new)->rb_right);
             else if (new_node->key < connect->key)
-            	new = &((*new)->rb_right);
+            	new = &((*new)->rb_left);
             else
             	printk("RB-TREE INSERT ERROR");
         }
@@ -179,18 +173,26 @@ void search(){
 	rb_insert_color(&new_node->node, &root_node);  // Rearrange red-black tree node color         
     }
     
-    /* Search */
+    /* Search node */
     for(i=0; i<NUM_OF_ENTRY; i++)
     {
-        struct rb_node *iter_node;
-        
         ktime_get_real_ts64(&spclock[0]);
-
-    	for(iter_node=rb_first(&root_node); iter_node; iter_node=rb_next(iter_node))
-    	{
-    	    if (i == rb_entry(iter_node, struct my_node, node)->key)
-    	        break;
-    	}
+	
+	struct rb_node *iter_node = root_node.rb_node;
+        while(iter_node)
+        {
+            struct my_node *child_node = rb_entry(iter_node, struct my_node, node);
+            
+            if (i > child_node->key)
+		iter_node = iter_node->rb_right;
+            else if (i < child_node->key)
+		iter_node = iter_node->rb_left;
+            else
+	    {
+    	        // printk("%d\n", i);
+		break;
+	    }
+        }
     
         ktime_get_real_ts64(&spclock[1]);
         calclock3(spclock, &add_to_hp_list_time, &add_to_hp_list_count);
@@ -224,9 +226,9 @@ void delete(){
         new_node->value = i*10;
         new_node->key = i;
         
+        // Find the link to connect new node
         struct rb_node **new = &(root_node.rb_node);
         struct rb_node *parent = NULL;
-        
         
         while(*new)
         {
@@ -234,9 +236,9 @@ void delete(){
             
             parent = *new;
             if (new_node->key > connect->key)
-                new = &((*new)->rb_left);
+                new = &((*new)->rb_right);
             else if (new_node->key < connect->key)
-            	new = &((*new)->rb_right);
+            	new = &((*new)->rb_left);
             else
             	printk("RB-TREE INSERT ERROR");
         }
@@ -245,28 +247,34 @@ void delete(){
 	rb_insert_color(&new_node->node, &root_node);  // Rearrange red-black tree node color         
     }
     
-    /* Delete Node */
+    /* Search and Delete node */
     for(i=0; i<NUM_OF_ENTRY; i++)
     {
-        struct rb_node *iter_node;
-        
         ktime_get_real_ts64(&spclock[0]);
-
-    	for(iter_node=rb_first(&root_node); iter_node; iter_node=rb_next(iter_node))
-    	{
-    	    if (i == rb_entry(iter_node, struct my_node, node)->key)
-    	    {
+	
+	struct rb_node *iter_node = root_node.rb_node;
+        while(iter_node)
+        {
+            struct my_node *child_node = rb_entry(iter_node, struct my_node, node);
+            
+            if (i > child_node->key)
+		iter_node = iter_node->rb_right;
+            else if (i < child_node->key)
+		iter_node = iter_node->rb_left;
+            else
+	    {
+    	        // printk("%d\n", i);
     	        rb_erase(iter_node, &root_node);
     	        kfree(iter_node);
 		break;
-    	    }
-    	}
-    	
+	    }
+        }
+    
         ktime_get_real_ts64(&spclock[1]);
         calclock3(spclock, &add_to_hp_list_time, &add_to_hp_list_count);
     }
     
-    // rbtree_print();
+    rbtree_print();
     
     /* Print Result */
     printk("DELETE %d Entries\n", NUM_OF_ENTRY);
@@ -276,7 +284,6 @@ void delete(){
 
 void rbtree_example(int op)
 {
-
     if (op == INSERT)
     {
     	insert();
