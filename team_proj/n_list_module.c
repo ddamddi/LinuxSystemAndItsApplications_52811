@@ -11,6 +11,10 @@
 #include <linux/time.h>
 #include <linux/sched.h>
 
+unsigned long long add_to_hp_list_time = 0;
+unsigned long long add_to_hp_list_count = 0;
+struct timespec64 spclock[2];
+
 struct sub_head{
     struct list_head h_list;
     struct list_head v_list;
@@ -25,6 +29,8 @@ struct node{
 
 struct rw_semaphore counter_rwse;
 
+void initialize_ts64(struct timespec64 *spclock);
+unsigned long long calclock3(struct timespec64 *spclock, unsigned long long *total_time, unsigned long long *total_count);
 void new_sub_head(struct list_head *head);
 void n_list_add(struct list_head *new, struct list_head *head);
 void n_list_del(struct list_head *entry, struct list_head *head);
@@ -33,6 +39,38 @@ static int _n_list_traverse(void *current_sub_head);
 struct list_head* n_list_get(int index, struct list_head* head);
 void init_n_list(struct list_head *head);
 void run(void);
+
+void initialize_ts64(struct timespec64 *spclock)
+{
+    int i;
+    for(i=0; i<2; i++)
+    {
+        spclock[i].tv_sec = 0;
+    	spclock[i].tv_nsec = 0;
+    }
+}
+
+unsigned long long calclock3(struct timespec64 *spclock, unsigned long long *total_time, unsigned long long *total_count){
+    long temp, temp_n;
+    unsigned long long timedelay = 0;
+    if(spclock[1].tv_nsec >= spclock[0].tv_nsec)
+    {
+        temp = spclock[1].tv_sec - spclock[0].tv_sec;
+	temp_n = spclock[1].tv_nsec - spclock[0].tv_nsec;
+	timedelay = BILLION * temp + temp_n;
+    }
+    else
+    {
+        temp = spclock[1].tv_sec - spclock[0].tv_sec - 1;
+	temp_n = BILLION + spclock[1].tv_nsec - spclock[0].tv_nsec;
+	timedelay = BILLION * temp + temp_n;
+    }
+    
+    __sync_fetch_and_add(total_time, timedelay);
+    __sync_fetch_and_add(total_count, 1);
+    return timedelay;
+}
+
 
 void new_sub_head(struct list_head *head)
 {
@@ -146,6 +184,7 @@ void run(void){
     struct list_head HEAD;
     int i;
     
+    initialize_ts64(spclock);
     init_n_list(&HEAD);
     init_rwsem(&counter_rwse);
     // printk("INITIALIZE HEAD\n");
@@ -202,10 +241,14 @@ void run(void){
     kthread_run(_n_list_traverse, (void*)data2,"TRAVERSE");
     */
     
-    // n_list_traverse(&HEAD, 0);
     
-    struct list_head* found_head = n_list_get(12500, &HEAD);
-    printk("found:%d\n", list_entry(found_head, struct node, v_list)->value);
+    ktime_get_real_ts64(&spclock[0]);
+    // struct list_head* found_head = n_list_get(12500, &HEAD);
+    n_list_traverse(&HEAD, 0);
+    ktime_get_real_ts64(&spclock[1]);
+    calclock3(spclock, &add_to_hp_list_time, &add_to_hp_list_count);
+    
+    //printk("found:%d\n", list_entry(found_head, struct node, v_list)->value);
 }
 
 int __init simple_module_init(void)
@@ -217,6 +260,7 @@ int __init simple_module_init(void)
 
 void __exit simple_module_cleanup(void)
 {
+    printk("time: %llu, count: %llu\n", add_to_hp_list_time, add_to_hp_list_count);
     printk("Bye Simple Module\n");
 }
 
