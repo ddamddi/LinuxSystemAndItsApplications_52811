@@ -1,8 +1,4 @@
 #define BILLION 1000000000
-#define INSERT 0
-#define SEARCH 1
-#define DELETE 2
-
 #define NUM_OF_ENTRY 100000
 
 #include <linux/kernel.h>
@@ -13,6 +9,7 @@
 #include <linux/delay.h>
 #include <linux/list.h>
 #include <linux/time.h>
+#include <linux/sched.h>
 
 struct sub_head{
     struct list_head h_list;
@@ -26,9 +23,13 @@ struct node{
    int value;
 };
 
+struct rw_semaphore counter_rwse;
+
 void new_sub_head(struct list_head *head);
 void n_list_add(struct list_head *new, struct list_head *head);
 void n_list_del(struct list_head *entry, struct list_head *head);
+void n_list_traverse(struct list_head *head, int num_of_thread);
+static int _n_list_traverse(void *current_sub_head);
 void init_n_list(struct list_head *head);
 void run(void);
 
@@ -73,6 +74,42 @@ void n_list_del(struct list_head *entry, struct list_head *head)
         list_del(&_sub_head->h_list);
 }
 
+void n_list_traverse(struct list_head* head, int num_of_thread)
+{
+    struct sub_head *current_sub_head;
+    struct list_head *hp;
+    list_for_each(hp, head)
+    {
+        //struct sub_head *data = list_entry(HEAD.next, struct sub_head, h_list);
+        //struct sub_head *data2 = list_entry(data->h_list.next, struct sub_head, h_list);
+        //kthread_run(_n_list_traverse, (void*)data,"TRAVERSE");
+        //kthread_run(_n_list_traverse, (void*)data2,"TRAVERSE");
+    
+        current_sub_head = list_entry(hp, struct sub_head, h_list);
+        struct sub_head* arg = kmalloc(sizeof(struct sub_head*), GFP_KERNEL);
+        arg = current_sub_head;
+        kthread_run(_n_list_traverse, (void*)arg, "TRAVERSE");
+        
+        //current_sub_head = list_entry(hp, struct sub_head, h_list);
+        //_n_list_traverse(current_sub_head);
+    }
+}
+
+static int _n_list_traverse(void *current_sub_head)
+{
+    struct sub_head *_current_sub_head = current_sub_head;
+    struct node *current_node;
+    struct list_head *p;
+        
+    list_for_each(p, &_current_sub_head->v_list)
+    {
+        down_write(&counter_rwse);
+        current_node = list_entry(p, struct node, v_list);
+        printk("%d\n", current_node->value);
+        up_write(&counter_rwse);
+    }
+    // do_exit(0);
+}
 
 void init_n_list(struct list_head *head)
 {
@@ -86,11 +123,12 @@ void run(void){
     int i;
     
     init_n_list(&HEAD);
+    init_rwsem(&counter_rwse);
     // printk("INITIALIZE HEAD\n");
     
     struct node *del_entry;
     
-    for(i=0; i<1500; i++)
+    for(i=0; i<NUM_OF_ENTRY; i++)
     {
         struct node *new = kmalloc(sizeof(struct node), GFP_KERNEL);
         new->value = i;
@@ -100,8 +138,9 @@ void run(void){
             del_entry = new;
     }
     
-    n_list_del(&del_entry->v_list, &HEAD);
+    //n_list_del(&del_entry->v_list, &HEAD);
     
+    /*
     // printk("START TRAVERSE\n");
     struct sub_head *current_sub_head;
     struct list_head *hp;
@@ -117,6 +156,7 @@ void run(void){
             printk("%d\n", current_node->value);
         }
     }
+    */
     
     
     
@@ -130,6 +170,14 @@ void run(void){
         printk("%d\n", current_node->value);
     }
     */
+    
+    /*
+    struct sub_head *data = list_entry(HEAD.next, struct sub_head, h_list);
+    struct sub_head *data2 = list_entry(data->h_list.next, struct sub_head, h_list);
+    kthread_run(_n_list_traverse, (void*)data,"TRAVERSE");
+    kthread_run(_n_list_traverse, (void*)data2,"TRAVERSE");
+    */
+    n_list_traverse(&HEAD, 0);
 }
 
 int __init simple_module_init(void)
