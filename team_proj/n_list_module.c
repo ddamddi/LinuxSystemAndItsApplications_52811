@@ -34,39 +34,39 @@ void run(void);
 
 void new_sub_head(struct list_head *head)
 {
-    printk("new_sub_head() called\n");
+    //printk("new_sub_head() called\n");
     struct sub_head *new = kmalloc(sizeof(struct sub_head), GFP_KERNEL);
     //list_entry(new, struct sub_head, h_list)->len = 0;
+    INIT_LIST_HEAD(&new->v_list);
     new->len = 0;
-    printk("0\n");
+    //printk("0\n");
     list_add(&new->h_list, head);
 }
 
 void n_list_add(struct list_head *new, struct list_head *head)
 {
-    printk("n_list_add() called\n");
+    //printk("n_list_add() called\n");
     if(list_entry(head->next, struct sub_head, h_list)->len >= 1000) 
         new_sub_head(head);
         
-    printk("0\n");
+    //printk("0\n");
     struct sub_head *tmp = list_entry(head->next, struct sub_head, h_list);
-    printk("%d\n", tmp->len);
+    //printk("%d\n", tmp->len);
     
-    printk("1\n");
+    //printk("1\n");
     list_add(new, &tmp->v_list);
     
-    printk("2\n");
+    //printk("2\n");
     list_entry(head->next, struct sub_head, h_list)->len++;
     
     // TODO : Sturct Node
-    printk("3\n");
     list_entry(new, struct node, v_list)->_sub = list_entry(head->next, struct sub_head, h_list); 
 }
 
 
 void init_n_list(struct list_head *head)
 {
-    printk("init_n_list() called\n");
+    // printk("init_n_list() called\n");
     INIT_LIST_HEAD(head);
     new_sub_head(head);
 }
@@ -76,24 +76,42 @@ void run(void){
     int i;
     
     init_n_list(&HEAD);
-    printk("INITIALIZE HEAD\n");
+    // printk("INITIALIZE HEAD\n");
     
-    for(i=0; i<10; i++)
+    for(i=0; i<1500; i++)
     {
         struct node *new = kmalloc(sizeof(struct node), GFP_KERNEL);
         new->value = i;
         n_list_add(&new->v_list, &HEAD);
-        printk("ADD NEW NODE\n");
+        // printk("ADD NEW NODE\n");
     }
     
+    // printk("START TRAVERSE\n");
+    struct sub_head *current_sub_head;
+    struct list_head *hp;
+    list_for_each(hp, &HEAD)
+    {
+        struct node *current_node;
+        struct list_head *p;
+        
+        current_sub_head = list_entry(hp, struct sub_head, h_list);
+        list_for_each(p, &current_sub_head->v_list)
+        {
+            current_node = list_entry(p, struct node, v_list);
+            printk("%d\n", current_node->value);
+        }
+    }
+    
+    /*
     struct node *current_node;
     struct list_head *p;
-    printk("START TRAVERSE\n");
-    list_for_each(p, &HEAD)
+    struct sub_head *_sub_head = list_entry(HEAD.next, struct sub_head, h_list);
+    list_for_each(p, &_sub_head->v_list)
     {
         current_node = list_entry(p, struct node, v_list);
         printk("%d\n", current_node->value);
     }
+    */
 }
 
 int __init simple_module_init(void)
@@ -110,3 +128,4 @@ void __exit simple_module_cleanup(void)
 
 module_init(simple_module_init);
 module_exit(simple_module_cleanup);
+
