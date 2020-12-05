@@ -30,6 +30,7 @@ void n_list_add(struct list_head *new, struct list_head *head);
 void n_list_del(struct list_head *entry, struct list_head *head);
 void n_list_traverse(struct list_head *head, int num_of_thread);
 static int _n_list_traverse(void *current_sub_head);
+struct list_head* n_list_get(int index, struct list_head* head);
 void init_n_list(struct list_head *head);
 void run(void);
 
@@ -111,6 +112,29 @@ static int _n_list_traverse(void *current_sub_head)
     // do_exit(0);
 }
 
+struct list_head* n_list_get(int index, struct list_head* head)
+{
+    struct list_head* current_sub = head->prev;
+    struct sub_head* current_sub_entry = list_entry(current_sub, struct sub_head, h_list);
+    
+    int index_sum = 0, i;
+    while(1)
+    {
+        if (current_sub_entry->len + index_sum >= index) break;
+        index_sum += current_sub_entry->len;
+        current_sub = current_sub->prev;
+        current_sub_entry = list_entry(current_sub, struct sub_head, h_list);
+    }
+    
+    struct list_head* current_list_head;
+    current_list_head = &current_sub_entry->v_list;
+    current_list_head = current_list_head->prev;
+    
+    for(i=0; i<index-index_sum; i++)
+        current_list_head = current_list_head->prev;
+    return current_list_head;
+}
+
 void init_n_list(struct list_head *head)
 {
     // printk("init_n_list() called\n");
@@ -177,7 +201,11 @@ void run(void){
     kthread_run(_n_list_traverse, (void*)data,"TRAVERSE");
     kthread_run(_n_list_traverse, (void*)data2,"TRAVERSE");
     */
-    n_list_traverse(&HEAD, 0);
+    
+    // n_list_traverse(&HEAD, 0);
+    
+    struct list_head* found_head = n_list_get(12500, &HEAD);
+    printk("found:%d\n", list_entry(found_head, struct node, v_list)->value);
 }
 
 int __init simple_module_init(void)
