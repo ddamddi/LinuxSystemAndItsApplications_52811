@@ -63,6 +63,16 @@ void n_list_add(struct list_head *new, struct list_head *head)
     list_entry(new, struct node, v_list)->_sub = list_entry(head->next, struct sub_head, h_list); 
 }
 
+void n_list_del(struct list_head *entry, struct list_head *head)
+{
+    struct sub_head *_sub_head = list_entry(entry, struct node, v_list)->_sub;
+    list_del(entry);
+    
+    _sub_head->len--;
+    if(_sub_head->len == 0)
+        list_del(&_sub_head->h_list);
+}
+
 
 void init_n_list(struct list_head *head)
 {
@@ -78,13 +88,19 @@ void run(void){
     init_n_list(&HEAD);
     // printk("INITIALIZE HEAD\n");
     
+    struct node *del_entry;
+    
     for(i=0; i<1500; i++)
     {
         struct node *new = kmalloc(sizeof(struct node), GFP_KERNEL);
         new->value = i;
         n_list_add(&new->v_list, &HEAD);
         // printk("ADD NEW NODE\n");
+        if(i == 1498)
+            del_entry = new;
     }
+    
+    n_list_del(&del_entry->v_list, &HEAD);
     
     // printk("START TRAVERSE\n");
     struct sub_head *current_sub_head;
@@ -101,6 +117,8 @@ void run(void){
             printk("%d\n", current_node->value);
         }
     }
+    
+    
     
     /*
     struct node *current_node;
