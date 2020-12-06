@@ -20,7 +20,6 @@ unsigned long long n_list_get_time = 0;
 unsigned long long n_list_get_count = 0;
 unsigned long long n_list_traverse_time = 0;
 unsigned long long n_list_traverse_count = 0;
-int count = 0;
 
 struct timespec64 spclock[2];
 void n_list_test_insert(void);
@@ -115,15 +114,11 @@ void n_list_test_get(void)
     
     for (i=0; i<NUM_OF_ENTRY; i++)
     {
-        unsigned long long __time = 0;
-        unsigned long long __count = 0;
         ktime_get_real_ts64(&spclock[0]);
         struct list_head* found = n_list_get(i, &HEAD);
         ktime_get_real_ts64(&spclock[1]);
-        calclock3(spclock, &__time, &__count);
-        n_list_delete_time += __time;
+        calclock3(spclock, &n_list_get_time, &n_list_get_count);
     }
-    n_list_get_time = (unsigned long long) (n_list_get_time/NUM_OF_ENTRY);
 }
 
 void n_list_test_traverse(void)
@@ -132,7 +127,6 @@ void n_list_test_traverse(void)
     struct list_head HEAD;
     init_n_list(&HEAD);
     int i;
-    count=0;
     
     for (i=0; i<NUM_OF_ENTRY; i++)
     {
@@ -142,19 +136,12 @@ void n_list_test_traverse(void)
     }
     
     ktime_get_real_ts64(&spclock[0]);
-    n_list_traverse(&HEAD, 0);   
-    while(1)
-    {
-    	if(count == NUM_OF_ENTRY)
-    	    break;
-    	//printk("count: %d  NUM_OF_ENTRY: 100000\n", count);
-    	msleep(1);
-    }
+    n_list_traverse(&HEAD, 0);
     
     ktime_get_real_ts64(&spclock[1]);
     calclock3(spclock, &n_list_traverse_time, &n_list_traverse_count);
     
-    printk("count: %d\n", count);
+    // printk("count: %d\n", count);
     
 }
 
@@ -173,7 +160,7 @@ void __exit proj_module_cleanup(void)
     printk("n_list testing Done\n");
     printk("n_list insert time : %llu\n", n_list_insert_time);
     printk("n_list delete time : %llu\n", n_list_delete_time);
-    printk("n_list get time : %llu\n", n_list_get_time);
+    printk("n_list get time : %llu\n", n_list_get_time / NUM_OF_ENTRY);
     printk("n_list traverse time : %llu\n", n_list_traverse_time);
 }
 

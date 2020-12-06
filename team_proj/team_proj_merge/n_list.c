@@ -1,3 +1,4 @@
+#define SUB_LENGTH 1000
 #define NUM_OF_ENTRY 100000
 
 #include <linux/kernel.h>
@@ -10,6 +11,8 @@
 #include "n_list.h"
 
 struct rw_semaphore counter_rwse;
+struct mutex my_mutex;
+unsigned long long count = 0;
 
 void new_sub_head(struct list_head *head)
 {
@@ -21,7 +24,7 @@ void new_sub_head(struct list_head *head)
 
 void n_list_add(struct list_head *new, struct list_head *head)
 {
-    if(list_entry(head->next, struct sub_head, h_list)->len >= 1000) 
+    if(list_entry(head->next, struct sub_head, h_list)->len >= SUB_LENGTH) 
         new_sub_head(head);
         
     struct sub_head *tmp = list_entry(head->next, struct sub_head, h_list);
@@ -56,6 +59,14 @@ void n_list_traverse(struct list_head* head, int num_of_thread)
         arg = current_sub_head;
         kthread_run(_n_list_traverse, (void*)arg, "TRAVERSE");
     }
+       
+    while(1)
+    {
+    	if(count == NUM_OF_ENTRY)
+    	    break;
+    	//printk("count: %d  NUM_OF_ENTRY: 100000\n", count);
+    	msleep(1);
+    }
 }
 
 static int _n_list_traverse(void *current_sub_head)
@@ -68,9 +79,12 @@ static int _n_list_traverse(void *current_sub_head)
     {
         down_read(&counter_rwse);
         current_node = list_entry(p, struct node, v_list);
-        printk("%d\n", current_node->value);
+        // printk("%d\n", current_node->value);
         up_read(&counter_rwse);
     }
+    mutex_lock(&my_mutex);
+    count += _current_sub_head->len;
+    mutex_unlock(&my_mutex);
 }
 
 struct list_head* n_list_get(int index, struct list_head* head)
