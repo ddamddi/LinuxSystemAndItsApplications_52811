@@ -18,8 +18,8 @@ unsigned long long n_list_delete_time = 0;
 unsigned long long n_list_delete_count = 0;
 unsigned long long n_list_get_time = 0;
 unsigned long long n_list_get_count = 0;
-unsigned long long n_list_traverse_time = 0;
-unsigned long long n_list_traverse_count = 0;
+unsigned long long n_list_search_time = 0;
+unsigned long long n_list_search_count = 0;
 
 struct timespec64 spclock[2];
 void n_list_test_insert(void);
@@ -61,44 +61,47 @@ unsigned long long calclock3(struct timespec64* spclock, unsigned long long* tot
 
 void n_list_test_insert(void)
 {
-    initialize_ts64(spclock);
+    int i;
     struct list_head HEAD;
     init_n_list(&HEAD);
-    int i;
-    for (i=0; i<NUM_OF_ENTRY; i++)
-    {
-        struct node *new = kmalloc(sizeof(struct node), GFP_KERNEL);
-        new->value = i+2000;
-        n_list_add(&new->v_list, &HEAD);
-    }
     
-    ktime_get_real_ts64(&spclock[0]);
-    struct node* new = kmalloc(sizeof(struct node), GFP_KERNEL);
-    new->value = 5555;
-    n_list_add(&new->v_list, &HEAD);
-    ktime_get_real_ts64(&spclock[1]);
-    calclock3(spclock, &n_list_insert_time, &n_list_insert_count);
+    for (i=0;i<NUM_OF_ENTRY;i++)
+    {
+        struct node* new=kmalloc(sizeof(struct node),GFP_KERNEL);
+        new->value=i;
+        ktime_get_real_ts64(&spclock[0]);
+        n_list_add(&new->v_list, &HEAD);
+        ktime_get_real_ts64(&spclock[1]);
+        calclock3(spclock, &n_list_insert_time, &n_list_insert_count);
+    }
 }
+
+
 void n_list_test_delete(void)
 {
-    initialize_ts64(spclock);
+    int i;
     struct list_head HEAD;
     init_n_list(&HEAD);
-    int i;
+    
     for (i=0; i<NUM_OF_ENTRY; i++)
     {
         struct node *new = kmalloc(sizeof(struct node), GFP_KERNEL);
-        new->value = i+2000;
+        new->value = i;
         n_list_add(&new->v_list, &HEAD);
     }
     
-    struct list_head* to_del = n_list_get(NUM_OF_ENTRY-1, &HEAD);
-    
-    ktime_get_real_ts64(&spclock[0]);
-    n_list_del(to_del, &HEAD);
-    ktime_get_real_ts64(&spclock[1]);
-    calclock3(spclock, &n_list_delete_time, &n_list_delete_count);
+    //DELETE
+    for (i=0;i<NUM_OF_ENTRY;i++)
+    {
+        struct list_head *tmp = &list_entry(HEAD.next, struct sub_head, h_list)->v_list;
+        ktime_get_real_ts64(&spclock[0]);
+        n_list_del(tmp->next, &HEAD);
+        ktime_get_real_ts64(&spclock[1]);
+        calclock3(spclock, &n_list_delete_time, &n_list_delete_count);
+    }
 }
+
+
 void n_list_test_get(void)
 {
     initialize_ts64(spclock);
@@ -139,7 +142,7 @@ void n_list_test_traverse(void)
     n_list_traverse(&HEAD, 0);
     
     ktime_get_real_ts64(&spclock[1]);
-    calclock3(spclock, &n_list_traverse_time, &n_list_traverse_count);
+    calclock3(spclock, &n_list_search_time, &n_list_search_count);
     
     // printk("count: %d\n", count);
     
@@ -158,10 +161,10 @@ int __init proj_module_init(void)
 void __exit proj_module_cleanup(void)
 {
     printk("n_list testing Done\n");
-    printk("n_list insert time : %llu\n", n_list_insert_time);
-    printk("n_list delete time : %llu\n", n_list_delete_time);
-    printk("n_list get time : %llu\n", n_list_get_time / NUM_OF_ENTRY);
-    printk("n_list traverse time : %llu\n", n_list_traverse_time);
+    printk("n_list INSERT time : %llu, count: %llu\n", n_list_insert_time, n_list_insert_count);
+    printk("n_list DELETE time : %llu, count: %llu\n", n_list_delete_time, n_list_delete_count);
+    printk("n_list GET time (AVG) : %llu ( %llu ), count: %llu\n", n_list_get_time, n_list_get_time/NUM_OF_ENTRY, n_list_get_count);
+    printk("n_list SEARCH time (AVG) : %llu ( %llu ), count: %llu\n", n_list_search_time, n_list_search_time/NUM_OF_ENTRY, n_list_search_count);
 }
 
 module_init(proj_module_init);
