@@ -73,7 +73,6 @@ struct list_head* list_get(int index, struct list_head* head)
    {
       current_list=current_list->prev;
    }
-   
    return current_list;
 }
 
@@ -139,12 +138,14 @@ void list_test_get(void)
     // GET
     struct node *current_node;
     struct list_head *p;
+    struct node query_node;
     struct list_head* found_head;
     
     for (i=0;i<NUM_OF_ENTRY;i++)
     {
     	ktime_get_real_ts64(&spclock[0]);
         found_head=list_get(i, &HEAD);
+        query_node = *list_entry(found_head, struct node, list);
         ktime_get_real_ts64(&spclock[1]);
         calclock3(spclock, &list_get_time, &list_get_count);
     }
@@ -166,9 +167,7 @@ void list_test_search(void)
 
     // SEARCH
     struct node *current_node;
-    int tmp;
     struct list_head *p;
-    struct list_head *current_list = &HEAD;
     
     for(i=0; i<NUM_OF_ENTRY; i++){
         ktime_get_real_ts64(&spclock[0]);
