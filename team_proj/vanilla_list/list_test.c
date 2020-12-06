@@ -16,15 +16,14 @@ struct node{
    int value;
 };
 
-
 unsigned long long list_insert_time=0;
 unsigned long long list_insert_count=0;
 unsigned long long list_delete_time=0;
 unsigned long long list_delete_count=0;
 unsigned long long list_get_time=0;
 unsigned long long list_get_count=0;
-unsigned long long list_traverse_time=0;
-unsigned long long list_traverse_count=0;
+unsigned long long list_search_time=0;
+unsigned long long list_search_count=0;
 
 void initialize_ts64(struct timespec64 *spclock);
 unsigned long long calclock3(struct timespec64 *spclock, unsigned long long *total_time, unsigned long long *total_count);
@@ -32,7 +31,7 @@ struct list_head* list_get(int index,struct list_head* head);
 void list_test_insert(void);
 void list_test_delete(void);
 void list_test_get(void);
-void list_test_traverse(void);
+void list_test_search(void);
 
 void initialize_ts64(struct timespec64 *spclock)
 {
@@ -87,19 +86,13 @@ void list_test_insert(void)
     int i;
     for (i=0;i<NUM_OF_ENTRY;i++)
     {
-       struct node* new=kmalloc(sizeof(struct node),GFP_KERNEL);
-       new->value=i;
-       list_add(&new->list,&HEAD);
+        struct node* new=kmalloc(sizeof(struct node),GFP_KERNEL);
+        new->value=i;
+        ktime_get_real_ts64(&spclock[0]);
+        list_add(&new->list,&HEAD);
+        ktime_get_real_ts64(&spclock[1]);
+        calclock3(spclock, &list_insert_time, &list_insert_count);
     }    
-
-    
-    //INSERT
-    ktime_get_real_ts64(&spclock[0]);
-    struct node* new=kmalloc(sizeof(struct node),GFP_KERNEL);
-    new->value=NUM_OF_ENTRY;
-    list_add(&new->list,&HEAD);
-    ktime_get_real_ts64(&spclock[1]);
-    calclock3(spclock, &list_insert_time, &list_insert_count);
 }
 
 void list_test_delete(void)
@@ -118,10 +111,14 @@ void list_test_delete(void)
 
 
     //DELETE
-    ktime_get_real_ts64(&spclock[0]);
-    list_del(HEAD.next);
-    ktime_get_real_ts64(&spclock[1]);
-    calclock3(spclock, &list_delete_time, &list_delete_count);
+    for (i=0;i<NUM_OF_ENTRY;i++)
+    {
+        ktime_get_real_ts64(&spclock[0]);
+        list_del(HEAD.next);
+        ktime_get_real_ts64(&spclock[1]);
+        calclock3(spclock, &list_delete_time, &list_delete_count);
+    }    
+
 }
 
 void list_test_get(void)
@@ -139,12 +136,12 @@ void list_test_get(void)
     }    
 
 
-    //TRAVERSE
+    // GET
     struct node *current_node;
     struct list_head *p;
     struct list_head* found_head;
     
-    for (i=99999;i<NUM_OF_ENTRY;i++)
+    for (i=0;i<NUM_OF_ENTRY;i++)
     {
     	ktime_get_real_ts64(&spclock[0]);
         found_head=list_get(i, &HEAD);
@@ -153,7 +150,7 @@ void list_test_get(void)
     }
 }
 
-void list_test_traverse(void)
+void list_test_search(void)
 {
     struct list_head HEAD;
     INIT_LIST_HEAD(&HEAD);
@@ -167,24 +164,23 @@ void list_test_traverse(void)
     }    
 
 
-    //TRAVERSE
+    // SEARCH
     struct node *current_node;
     int tmp;
     struct list_head *p;
     struct list_head *current_list = &HEAD;
     
-    ktime_get_real_ts64(&spclock[0]);
-    list_for_each(p, &HEAD)
-    {
-       current_node=list_entry(p,struct node,list);
-    }
-    
     for(i=0; i<NUM_OF_ENTRY; i++){
-    	current_list = current_list->next;
-    	tmp = list_entry(current_list, struct node, list)->value;
+        ktime_get_real_ts64(&spclock[0]);
+        list_for_each(p, &HEAD)
+        {
+            current_node=list_entry(p, struct node, list);
+            if(current_node->value == i)
+       	        break;
+        }
+        ktime_get_real_ts64(&spclock[1]);
+        calclock3(spclock, &list_search_time, &list_search_count);
     }
-    ktime_get_real_ts64(&spclock[1]);
-    calclock3(spclock, &list_traverse_time, &list_traverse_count);
 }
 
 
@@ -194,17 +190,17 @@ int __init simple_module_init(void)
     list_test_insert();
     list_test_delete();
     list_test_get();
-    list_test_traverse();
+    list_test_search();
     return 0;
 }
 
 void __exit simple_module_cleanup(void)
 {
     printk("list testing Done\n");
-    printk("list insert time : %llu, count: %llu\n", list_insert_time, list_insert_count);
-    printk("list delete time : %llu, count: %llu\n", list_delete_time, list_delete_count);
-    printk("list get time : %llu, count: %llu\n", list_get_time, list_get_count);
-    printk("list traverse time : %llu, count: %llu\n", list_traverse_time, list_traverse_count);
+    printk("list INSERT time : %llu, count: %llu\n", list_insert_time, list_insert_count);
+    printk("list DELETE time : %llu, count: %llu\n", list_delete_time, list_delete_count);
+    printk("list GET time (AVG) : %llu ( %llu ), count: %llu\n", list_get_time, list_get_time/NUM_OF_ENTRY, list_get_count);
+    printk("list SEARCH time (AVG) : %llu ( %llu ), count: %llu\n", list_search_time, list_search_time/NUM_OF_ENTRY, list_search_count);
 }
 
 module_init(simple_module_init);
