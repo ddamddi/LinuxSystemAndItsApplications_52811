@@ -28,6 +28,8 @@ struct node{
 };
 
 struct rw_semaphore counter_rwse;
+struct mutex my_mutex;
+int count;
 
 void initialize_ts64(struct timespec64 *spclock);
 unsigned long long calclock3(struct timespec64 *spclock, unsigned long long *total_time, unsigned long long *total_count);
@@ -36,6 +38,7 @@ void n_list_add(struct list_head *new, struct list_head *head);
 void n_list_del(struct list_head *entry, struct list_head *head);
 void n_list_traverse(struct list_head *head, int num_of_thread);
 static int _n_list_traverse(void *current_sub_head);
+static int _n_list_traverse_prev(void *current_sub_head);
 struct list_head* n_list_get(int index, struct list_head* head);
 void init_n_list(struct list_head *head);
 void run(void);
@@ -86,7 +89,7 @@ void new_sub_head(struct list_head *head)
 void n_list_add(struct list_head *new, struct list_head *head)
 {
     //printk("n_list_add() called\n");
-    if(list_entry(head->next, struct sub_head, h_list)->len >= 1000) 
+    if(list_entry(head->next, struct sub_head, h_list)->len >= 100000) 
         new_sub_head(head);
         
     //printk("0\n");
@@ -99,7 +102,7 @@ void n_list_add(struct list_head *new, struct list_head *head)
     //printk("2\n");
     list_entry(head->next, struct sub_head, h_list)->len++;
     
-    // TODO : Sturct Node
+    // TODO : sturct node
     list_entry(new, struct node, v_list)->_sub = list_entry(head->next, struct sub_head, h_list); 
 }
 
@@ -117,6 +120,7 @@ void n_list_traverse(struct list_head* head, int num_of_thread)
 {
     struct sub_head *current_sub_head;
     struct list_head *hp;
+    // int n = 0;
     list_for_each(hp, head)
     {
         //struct sub_head *data = list_entry(HEAD.next, struct sub_head, h_list);
@@ -127,11 +131,20 @@ void n_list_traverse(struct list_head* head, int num_of_thread)
         current_sub_head = list_entry(hp, struct sub_head, h_list);
         struct sub_head* arg = kmalloc(sizeof(struct sub_head*), GFP_KERNEL);
         arg = current_sub_head;
+        // n++;
         kthread_run(_n_list_traverse, (void*)arg, "TRAVERSE");
+        // printk("%d\n", n);
         
         //current_sub_head = list_entry(hp, struct sub_head, h_list);
         //_n_list_traverse(current_sub_head);
     }
+    
+    /*
+    struct sub_head *data = list_entry(head->next, struct sub_head, h_list);
+    struct sub_head *data_prev = list_entry(head->prev, struct sub_head, h_list);
+    kthread_run(_n_list_traverse, (void*)data,"TRAVERSE");
+    kthread_run(_n_list_traverse_prev, (void*)data_prev,"TRAVERSE_PREV");
+    */
 }
 
 static int _n_list_traverse(void *current_sub_head)
@@ -139,8 +152,27 @@ static int _n_list_traverse(void *current_sub_head)
     struct sub_head *_current_sub_head = current_sub_head;
     struct node *current_node;
     struct list_head *p;
-        
+    
+    //list_for_each()
     list_for_each(p, &_current_sub_head->v_list)
+    {
+        down_read(&counter_rwse);
+        current_node = list_entry(p, struct node, v_list);
+        //printk("%d\n", current_node->value);
+        up_read(&counter_rwse);
+    }
+    mutex_lock(&my_mutex);
+    count += _current_sub_head->len;
+    mutex_unlock(&my_mutex);
+}
+
+static int _n_list_traverse_prev(void *current_sub_head)
+{
+    struct sub_head *_current_sub_head = current_sub_head;
+    struct node *current_node;
+    struct list_head *p;
+        
+    list_for_each_prev(p, &_current_sub_head->v_list)
     {
         down_write(&counter_rwse);
         current_node = list_entry(p, struct node, v_list);
@@ -183,10 +215,12 @@ void init_n_list(struct list_head *head)
 void run(void){
     struct list_head HEAD;
     int i;
+    count = 0;
     
     initialize_ts64(spclock);
     init_n_list(&HEAD);
     init_rwsem(&counter_rwse);
+    mutex_init(&my_mutex);
     // printk("INITIALIZE HEAD\n");
     
     struct node *del_entry;
@@ -204,9 +238,11 @@ void run(void){
     //n_list_del(&del_entry->v_list, &HEAD);
     
     /*
-    // printk("START TRAVERSE\n");
     struct sub_head *current_sub_head;
     struct list_head *hp;
+    
+    printk("START TRAVERSE\n");
+    ktime_get_real_ts64(&spclock[0]);
     list_for_each(hp, &HEAD)
     {
         struct node *current_node;
@@ -219,8 +255,9 @@ void run(void){
             printk("%d\n", current_node->value);
         }
     }
+    ktime_get_real_ts64(&spclock[1]);
+    calclock3(spclock, &add_to_hp_list_time, &add_to_hp_list_count);
     */
-    
     
     
     /*
@@ -242,12 +279,23 @@ void run(void){
     */
     
     
-    ktime_get_real_ts64(&spclock[0]);
     // struct list_head* found_head = n_list_get(12500, &HEAD);
+    ktime_get_real_ts64(&spclock[0]);
     n_list_traverse(&HEAD, 0);
+    
+    while(1)
+    {
+    	if(count == NUM_OF_ENTRY)
+    	    break;
+    	//printk("count: %d  NUM_OF_ENTRY: 100000\n", count);
+    	msleep(1);
+    }
+    
     ktime_get_real_ts64(&spclock[1]);
     calclock3(spclock, &add_to_hp_list_time, &add_to_hp_list_count);
     
+    printk("count: %d\n", count);
+    printk("time: %llu, count: %llu\n", add_to_hp_list_time, add_to_hp_list_count);
     //printk("found:%d\n", list_entry(found_head, struct node, v_list)->value);
 }
 
