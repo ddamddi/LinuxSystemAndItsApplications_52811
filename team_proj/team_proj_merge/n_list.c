@@ -1,4 +1,4 @@
-#define SUB_LENGTH 1000
+#define SUB_LENGTH 10000
 #define NUM_OF_ENTRY 100000
 
 #include <linux/kernel.h>
@@ -11,8 +11,10 @@
 #include "n_list.h"
 
 struct rw_semaphore counter_rwse;
-struct mutex my_mutex;
+//struct mutex my_mutex;
 unsigned long long count = 0;
+
+struct list_head thread_list_head;
 
 void new_sub_head(struct list_head *head)
 {
@@ -48,43 +50,72 @@ void n_list_del(struct list_head *entry, struct list_head *head)
         list_del(&_sub_head->h_list);
 }
 
-void n_list_traverse(struct list_head* head, int num_of_thread)
+void n_list_traverse(struct list_head* head, int to_find)
 {
+    INIT_LIST_HEAD(&thread_list_head);
     struct sub_head *current_sub_head;
     struct list_head *hp;
+    int thread_counter=0;
+    
     list_for_each(hp, head)
     { 
+        struct th_info *t_info = kmalloc(sizeof(struct th_info*), GFP_KERNEL);
         current_sub_head = list_entry(hp, struct sub_head, h_list);
-        struct sub_head* arg = kmalloc(sizeof(struct sub_head*), GFP_KERNEL);
-        arg = current_sub_head;
-        kthread_run(_n_list_traverse, (void*)arg, "TRAVERSE");
-    }
-       
-    while(1)
-    {
-    	if(count == NUM_OF_ENTRY)
-    	    break;
-    	//printk("count: %d  NUM_OF_ENTRY: 100000\n", count);
-    	msleep(1);
+        // struct sub_head* arg = kmalloc(sizeof(struct sub_head*), GFP_KERNEL);
+        struct thread_arg *arg = kmalloc(sizeof(struct thread_arg*), GFP_KERNEL);
+        arg->s = current_sub_head;
+        arg->to_find = to_find;
+        arg->thread_number = thread_counter;
+        thread_counter++;
+        
+        t_info->g_th_id = kthread_run(_n_list_traverse, (void*)arg, "TRAVERSE");
+        list_add(&t_info->list, &thread_list_head);
     }
 }
 
-static int _n_list_traverse(void *current_sub_head)
+static int _n_list_traverse(void *thread_arg)
 {
-    struct sub_head *_current_sub_head = current_sub_head;
+    struct sub_head *_current_sub_head = ((struct thread_arg*)thread_arg)->s;
+    int to_find = ((struct thread_arg*)thread_arg)->to_find;
+    int thread_number = ((struct thread_arg*)thread_arg)->thread_number;
     struct node *current_node;
     struct list_head *p;
+    int isFound = 0, i;
         
     list_for_each(p, &_current_sub_head->v_list)
     {
         down_read(&counter_rwse);
         current_node = list_entry(p, struct node, v_list);
         // printk("%d\n", current_node->value);
+        
+        if(current_node->value == to_find)
+        {
+            isFound = 1;
+            up_read(&counter_rwse);
+            break;
+        }
         up_read(&counter_rwse);
     }
-    mutex_lock(&my_mutex);
-    count += _current_sub_head->len;
-    mutex_unlock(&my_mutex);
+    
+    if(isFound)
+    {
+        // All thread stop
+        
+        printk("FIND ; %d\n", to_find);
+        struct list_head *p;
+        struct list_head * new_head = &thread_list_head;
+        
+        for(i=0; i<thread_number; i++)
+        {
+            new_head = new_head->next;
+        }
+        new_head = new_head->next;
+        
+        list_for_each(p, new_head)
+        {
+            kthread_stop(list_entry(p, struct th_info, list)->g_th_id);
+        }
+    }
 }
 
 struct list_head* n_list_get(int index, struct list_head* head)

@@ -78,11 +78,10 @@ struct list_head* list_get(int index, struct list_head* head)
 
 void list_test_insert(void)
 {   
+    int i;
     struct list_head HEAD;
-    
     INIT_LIST_HEAD(&HEAD);
     
-    int i;
     for (i=0;i<NUM_OF_ENTRY;i++)
     {
         struct node* new=kmalloc(sizeof(struct node),GFP_KERNEL);

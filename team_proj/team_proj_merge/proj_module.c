@@ -20,12 +20,13 @@ unsigned long long n_list_get_time = 0;
 unsigned long long n_list_get_count = 0;
 unsigned long long n_list_search_time = 0;
 unsigned long long n_list_search_count = 0;
-
 struct timespec64 spclock[2];
+
+
 void n_list_test_insert(void);
 void n_list_test_delete(void);
 void n_list_test_get(void);
-void n_list_test_traverse(void);
+void n_list_test_search(void);
 void initialize_ts64(struct timespec64* spclock);
 unsigned long long calclock3(struct timespec64* spclock, unsigned long long* total_time, unsigned long long* total_count);
 
@@ -111,7 +112,7 @@ void n_list_test_get(void)
     for (i=0; i<NUM_OF_ENTRY; i++)
     {
         struct node *new = kmalloc(sizeof(struct node), GFP_KERNEL);
-        new->value = i+2000;
+        new->value = i;
         n_list_add(&new->v_list, &HEAD);
     }
     
@@ -124,47 +125,44 @@ void n_list_test_get(void)
     }
 }
 
-void n_list_test_traverse(void)
+void n_list_test_search(void)
 {
-    initialize_ts64(spclock);
-    struct list_head HEAD;
-    init_n_list(&HEAD);
     int i;
+    struct list_head HEAD;
+    init_n_list(&HEAD);    
     
     for (i=0; i<NUM_OF_ENTRY; i++)
     {
         struct node *new = kmalloc(sizeof(struct node), GFP_KERNEL);
-        new->value = i+2000;
+        new->value = i;
         n_list_add(&new->v_list, &HEAD);
     }
     
-    ktime_get_real_ts64(&spclock[0]);
-    n_list_traverse(&HEAD, 0);
-    
-    ktime_get_real_ts64(&spclock[1]);
-    calclock3(spclock, &n_list_search_time, &n_list_search_count);
-    
-    // printk("count: %d\n", count);
-    
+    for(i=0; i<2; i++){
+        ktime_get_real_ts64(&spclock[0]);
+        n_list_traverse(&HEAD, i);
+        ktime_get_real_ts64(&spclock[1]);
+        calclock3(spclock, &n_list_search_time, &n_list_search_count);
+    }
 }
 
 int __init proj_module_init(void)
 {
-    printk(KERN_EMERG "n_list testing Module\n");
+    printk(KERN_EMERG "Multi-head list testing Module\n");
     n_list_test_insert();
     n_list_test_delete();
     n_list_test_get();
-    n_list_test_traverse();
+    n_list_test_search();
     return 0;
 }
 
 void __exit proj_module_cleanup(void)
 {
-    printk("n_list testing Done\n");
-    printk("n_list INSERT time : %llu, count: %llu\n", n_list_insert_time, n_list_insert_count);
-    printk("n_list DELETE time : %llu, count: %llu\n", n_list_delete_time, n_list_delete_count);
-    printk("n_list GET time (AVG) : %llu ( %llu ), count: %llu\n", n_list_get_time, n_list_get_time/NUM_OF_ENTRY, n_list_get_count);
-    printk("n_list SEARCH time (AVG) : %llu ( %llu ), count: %llu\n", n_list_search_time, n_list_search_time/NUM_OF_ENTRY, n_list_search_count);
+    printk("Multi-head list testing Done\n");
+    printk("Multi-head list INSERT time : %llu, count: %llu\n", n_list_insert_time, n_list_insert_count);
+    printk("Multi-head list DELETE time : %llu, count: %llu\n", n_list_delete_time, n_list_delete_count);
+    printk("Multi-head list GET time (AVG) : %llu ( %llu ), count: %llu\n", n_list_get_time, n_list_get_time/NUM_OF_ENTRY, n_list_get_count);
+    printk("Multi-head list SEARCH time (AVG) : %llu ( %llu ), count: %llu\n", n_list_search_time, n_list_search_time/NUM_OF_ENTRY, n_list_search_count);
 }
 
 module_init(proj_module_init);
