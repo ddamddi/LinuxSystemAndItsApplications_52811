@@ -9,4 +9,4 @@
 - `assignment10` - Atomic instruction & three locking mechanism (spinlock, mutex, RW semaphore)  
 - `team_proj`
   - new kernel data structure
-  - ![multi_head linked list](./img/data_structure.PNG)
+  ![multi_head linked list](./img/data_structure.PNG)
